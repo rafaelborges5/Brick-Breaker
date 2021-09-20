@@ -1,0 +1,329 @@
+import pygame
+import math
+from time import sleep
+from pygame.locals import (
+K_RIGHT,
+K_LEFT,
+K_ESCAPE,
+QUIT,
+KEYDOWN,
+K_SPACE,
+K_e,
+K_m,
+K_h,
+)
+
+#Game Variables
+backgroundColor = [188, 194, 204]
+paddle_color = [4, 7, 186]
+ball_color = [0, 0, 0]
+block_color = [191, 2, 2]
+easy_color = [66, 242, 22]
+medium_color = [250, 236, 35]
+speed = 0
+
+screenW, screenH = 800, 450
+
+n = 10
+blockw = screenW / n
+blockh = blockw / 2
+
+offset = 10
+paddle_w, paddle_h = 70, 15
+paddle_x = screenW / 2
+paddle_y = screenH - offset - (paddle_h / 2)
+
+
+#Game Classes
+class Block(pygame.sprite.Sprite):
+
+    def __init__(self, color, x, y):
+
+        super().__init__()
+        self.image = pygame.Surface([blockw, blockh])
+        self.image.fill(color)
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+
+class Ball(pygame.sprite.Sprite):
+
+    x = 390
+    y = paddle_y - 10
+    direction = 0
+    width = 10
+    height = 10
+
+    def __init__(self):
+
+        super().__init__()
+
+        self.image = pygame.Surface([self.width, self.height])
+        self.image.fill(ball_color)
+        self.rect = self.image.get_rect()
+        self.screenwidth = pygame.display.get_surface().get_width()
+        self.screenheight = pygame.display.get_surface().get_height()
+
+    def bounce(self, diff):
+
+        self.direction = (180 - self.direction) % 360
+        self.direction -= diff
+
+    def update(self, ball_speed):
+
+        self.speed = ball_speed
+
+        direction_radians = math.radians(self.direction)
+
+        self.x += self.speed * math.sin(direction_radians)
+        self.y -= self.speed * math.cos(direction_radians)
+
+        self.rect.x = self.x
+        self.rect.y = self.y
+
+        if self.y <= 0:
+            self.bounce(0)
+            self.y = 1
+
+        if self.x <= 0:
+            self.direction = (360 - self.direction) % 360
+            self.x = 1
+
+        if self.x >= self.screenwidth - self.width:
+            self.direction = (360 - self.direction) % 360
+            self.x = self.screenwidth - self.width - 1
+
+        if self.y >= self.screenheight:
+            self.bounce(0)
+            self.x = paddle_x
+            self.y = paddle_y
+            self.direction = 0
+            sleep(1)
+            return True
+
+
+class Player(pygame.sprite.Sprite):
+
+    def __init__(self):
+
+        super().__init__()
+
+        self.image = pygame.Surface([paddle_w, paddle_h])
+        self.image.fill(paddle_color)
+
+        self.rect = self.image.get_rect()
+        self.screenwidth = pygame.display.get_surface().get_width()
+        self.screenheight = pygame.display.get_surface().get_height()
+
+        self.rect.x = paddle_x
+        self.rect.y = paddle_y
+
+    def update(self, pressed_keys):
+        if pressed_keys[K_LEFT]:
+            self.rect.move_ip(-10, 0)
+        if pressed_keys[K_RIGHT]:
+            self.rect.move_ip(10, 0)
+        if self.rect.left < 0:
+            self.rect.left = 0
+        if self.rect.right > screenW:
+            self.rect.right = screenW
+
+
+#Display settings
+pygame.init()
+
+display = pygame.display.set_mode([screenW, screenH])
+
+pygame.display.set_caption("Brick Breaker")
+
+#Texts and fonts
+font32 = pygame.font.Font("freesansbold.ttf", 32)
+font16 = pygame.font.Font("freesansbold.ttf", 16)
+
+text_pause1 = font32.render("PAUSED", True, ball_color, backgroundColor)
+text_pause2 = font16.render("press space to continue", True, ball_color, backgroundColor)
+init_text1 = font32.render("Welcome to Brick Breaker", True, block_color, backgroundColor)
+
+text_rect_pause1 = text_pause1.get_rect()
+text_rect_pause2 = text_pause2.get_rect()
+text_rect_init1 = init_text1.get_rect()
+
+text_rect_pause1.center = (screenW / 2, screenH / 2)
+text_rect_pause2.center = (screenW / 2, 3 * (screenH / 4))
+text_rect_init1.center = (screenW / 2, screenH / 2)
+
+#Surfaces and sprites
+
+background = pygame.Surface(display.get_size())
+
+blocks = pygame.sprite.Group()
+balls = pygame.sprite.Group()
+all_sprites = pygame.sprite.Group()
+
+player = Player()
+all_sprites.add(player)
+
+ball = Ball()
+balls.add(ball)
+all_sprites.add(ball)
+
+top = 25
+
+#Block setting
+for row in range(4):
+    for column in range(0, n):
+        block = Block(block_color, column * (blockw + 2) + 1, top)
+        blocks.add(block)
+        all_sprites.add(block)
+
+    top += blockh + 2
+
+clock = pygame.time.Clock()
+
+#More game variables
+loop_count  = 0
+pause = True
+lifes = 3
+
+#Game loop
+while lifes > 0:
+
+    clock.tick(30)
+
+    display.fill(backgroundColor)
+
+    #Event loop
+    for event in pygame.event.get():
+        if event.type == KEYDOWN:
+            if event.key == K_ESCAPE:
+                lifes -= 3
+
+            if event.key == K_SPACE:
+                if loop_count != 0:
+                    pause = not pause
+            if loop_count == 0:
+                if event.key == K_e:
+                    pause = not pause
+                    speed = 10
+                if event.key == K_m:
+                    pause = not pause
+                    speed = 14
+                if event.key == K_h:
+                    pause = not pause
+                    speed = 18
+
+        elif event.type == QUIT:
+            lifes -= 3
+
+    if pause:
+        if loop_count != 0:
+            display.fill(backgroundColor)
+
+            display.blit(text_pause1, text_rect_pause1)
+            display.blit(text_pause2, text_rect_pause2)
+
+            pygame.display.update()
+
+        elif loop_count == 0:
+            display.fill(backgroundColor)
+
+            display.blit(init_text1, text_rect_init1)
+
+            text_easy = font32.render("EASY", True, backgroundColor, easy_color)
+            text_medium = font32.render("MEDIUM", True, backgroundColor, medium_color)
+            text_hardcore = font32.render("HARDCORE", True, backgroundColor, block_color)
+
+            text_easy_instr = font16.render("Press E", True, ball_color, backgroundColor)
+            text_medium_instr = font16.render("Press M", True, ball_color, backgroundColor)
+            text_hardcore_instr = font16.render("Press H", True, ball_color, backgroundColor)
+
+            text_rect_easy = text_easy.get_rect()
+            text_rect_medium = text_medium.get_rect()
+            text_rect_hardcore = text_hardcore.get_rect()
+
+            text_rect_easy_instr = text_easy_instr.get_rect()
+            text_rect_medium_instr = text_medium_instr.get_rect()
+            text_rect_hardcore_instr = text_hardcore_instr.get_rect()
+
+            text_rect_easy.center = (screenW / 4, 3 * (screenH / 4))
+            text_rect_medium.center = (2 * (screenW / 4), 3 * (screenH / 4))
+            text_rect_hardcore.center = (3 * (screenW / 4), 3 * (screenH / 4))
+
+            text_rect_easy_instr.center = (screenW / 4, 3 * (screenH / 4) + 40)
+            text_rect_medium_instr.center = (2 * (screenW / 4), 3 * (screenH / 4) + 40)
+            text_rect_hardcore_instr.center = (3 * (screenW / 4), 3 * (screenH / 4) + 40)
+
+            display.blit(text_easy, text_rect_easy)
+            display.blit(text_medium, text_rect_medium)
+            display.blit(text_hardcore, text_rect_hardcore)
+
+            display.blit(text_easy_instr, text_rect_easy_instr)
+            display.blit(text_medium_instr, text_rect_medium_instr)
+            display.blit(text_hardcore_instr, text_rect_hardcore_instr)
+
+            pygame.display.update()
+
+    elif not pause:
+
+        pressed_keys = pygame.key.get_pressed()
+        player.update(pressed_keys)
+        lost_life = ball.update(speed)
+        if lost_life:
+            lifes -= 1
+
+        if lifes == 0:
+            if lifes == 0:
+                display.fill(backgroundColor)
+                text_over = font32.render("Game Over", True, ball_color, backgroundColor)
+                text_rect_over = text_over.get_rect()
+                text_rect_over.center = (screenW / 2, screenH / 2)
+                display.blit(text_over, text_rect_over)
+                pygame.display.update()
+
+        if pygame.sprite.spritecollide(player, balls, False):
+            diff = (player.rect.x + paddle_w / 2) - (ball.rect.x + ball.width / 2)
+
+            ball.rect.y = display.get_height() - paddle_h - ball.rect.height - 1
+            ball.bounce(diff)
+
+        deadblocks = pygame.sprite.spritecollide(ball, blocks, True)
+
+        if len(deadblocks) > 0:
+            ball.bounce(0)
+
+            if len(blocks) == 0:
+                text_won = font32.render("YOU WON", True, block_color, backgroundColor)
+                text_won_rect = text_won.get_rect()
+                text_won_rect.center = (screenW / 2, screenH / 2)
+                display.blit(text_won, text_won_rect)
+                pygame.display.update()
+                lifes -= 3
+
+        all_sprites.draw(display)
+
+        pygame.display.flip()
+
+        loop_count += 1
+
+        if lifes < 0:
+            lifes = 0
+
+        life_text = font32.render("Lifes: " + str(lifes), True, ball_color, backgroundColor)
+        life_text_rect = life_text.get_rect()
+        life_text_rect.center = (70, 20)
+        display.blit(life_text, life_text_rect)
+
+        pygame.display.update()
+
+        if lifes == 0:
+            sleep(2)
+
+
+pygame.quit()
+
+
+
+
+
+
